@@ -1,6 +1,7 @@
 import * as React from "react";
 import { UserAgentApplication, Account, AuthResponse, AuthError } from "msal";
 import { IdToken } from "msal/lib-commonjs/IdToken";
+import {StringDict} from "msal/lib-commonjs/MsalTypes";
 
 type MicrosoftLoginButtonTheme = "dark_short" | "light_short" | "dark" | "light";
 type MicrosoftLoginPrompt = "login" | "select_account" | "consent" | "none";
@@ -95,6 +96,7 @@ interface GraphAPIUserData extends AuthResponse {
 interface MicrosoftLoginState {
   msalInstance?: UserAgentApplication;
   scopes: [string];
+  extraQueryParameters?: StringDict;
 }
 
 declare class MicrosoftLogin extends React.Component<

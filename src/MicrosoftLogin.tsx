@@ -8,6 +8,7 @@ import {
   MicrosoftLoginPrompt
 } from "../index";
 import MicrosoftLoginButton from "./MicrosoftLoginButton";
+import { StringDict } from "msal/lib-commonjs/MsalTypes";
 
 interface UserAgentApp {
   clientId: string;
@@ -20,6 +21,7 @@ interface GraphAPITokenAndUser {
   withUserData: boolean;
   authCallback: any;
   isRedirect: boolean;
+  extraQueryParameters?: StringDict;
 }
 interface PopupLogin {
   msalInstance: UserAgentApplication;
@@ -27,11 +29,13 @@ interface PopupLogin {
   withUserData: boolean;
   authCallback: any;
   prompt?: MicrosoftLoginPrompt;
+  extraQueryParameters?: StringDict;
 }
 interface RedirectLogin {
   msalInstance: UserAgentApplication;
   scopes: [string];
   prompt?: MicrosoftLoginPrompt;
+  extraQueryParameters?: StringDict;
 }
 
 const CLIENT_ID_REGEX = /[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}/;
@@ -67,15 +71,22 @@ export default class MicrosoftLogin extends React.Component<
 > {
   constructor(props: any) {
     super(props);
-    const { graphScopes, clientId, tenantUrl, redirectUri } = props;
+    const {
+      graphScopes,
+      clientId,
+      tenantUrl,
+      redirectUri,
+      extraQueryParameters
+    } = props;
     this.state = {
       msalInstance: getUserAgentApp({ clientId, tenantUrl, redirectUri }),
-      scopes: getScopes(graphScopes)
+      scopes: getScopes(graphScopes),
+      extraQueryParameters: extraQueryParameters
     };
   }
 
   componentDidMount() {
-    const { msalInstance, scopes } = this.state;
+    const { msalInstance, scopes, extraQueryParameters } = this.state;
     const { authCallback, withUserData = false } = this.props;
     if (!msalInstance) {
       this.log("Initialization", "clientID broken or not provided", true);
@@ -93,7 +104,8 @@ export default class MicrosoftLogin extends React.Component<
               scopes,
               withUserData,
               authCallback,
-              isRedirect: true
+              isRedirect: true,
+              extraQueryParameters
             });
           } else {
             this.log(
@@ -122,7 +134,7 @@ export default class MicrosoftLogin extends React.Component<
   }
 
   login = () => {
-    const { msalInstance, scopes } = this.state;
+    const { msalInstance, scopes, extraQueryParameters } = this.state;
     const {
       withUserData = false,
       authCallback,
@@ -133,14 +145,20 @@ export default class MicrosoftLogin extends React.Component<
     if (msalInstance) {
       this.log("Login STARTED");
       if (forceRedirectStrategy || this.checkToIE()) {
-        this.redirectLogin({ msalInstance, scopes, prompt });
+        this.redirectLogin({
+          msalInstance,
+          scopes,
+          prompt,
+          extraQueryParameters
+        });
       } else {
         this.popupLogin({
           msalInstance,
           scopes,
           withUserData,
           authCallback,
-          prompt
+          prompt,
+          extraQueryParameters
         });
       }
     } else {
@@ -153,10 +171,11 @@ export default class MicrosoftLogin extends React.Component<
     scopes,
     withUserData,
     authCallback,
-    isRedirect
+    isRedirect,
+    extraQueryParameters
   }: GraphAPITokenAndUser) {
     return msalInstance
-      .acquireTokenSilent({ scopes })
+      .acquireTokenSilent({ scopes, extraQueryParameters })
       .catch((error: any) => {
         this.log(
           "Fetch Graph API 'access_token' in silent mode is FAILED",
@@ -165,10 +184,10 @@ export default class MicrosoftLogin extends React.Component<
         );
         if (isRedirect) {
           this.log("Fetch Graph API 'access_token' with redirect STARTED");
-          msalInstance.acquireTokenRedirect({ scopes });
+          msalInstance.acquireTokenRedirect({ scopes, extraQueryParameters });
         } else {
           this.log("Fetch Graph API 'access_token' with popup STARTED");
-          msalInstance.acquireTokenPopup({ scopes });
+          msalInstance.acquireTokenPopup({ scopes, extraQueryParameters });
         }
       })
       .then((authResponseWithAccessToken: AuthResponse) => {
@@ -194,11 +213,12 @@ export default class MicrosoftLogin extends React.Component<
     scopes,
     withUserData,
     authCallback,
-    prompt
+    prompt,
+    extraQueryParameters
   }: PopupLogin) {
     this.log("Fetch Azure AD 'token' with popup STARTED");
     msalInstance
-      .loginPopup({ scopes, prompt })
+      .loginPopup({ scopes, prompt, extraQueryParameters })
       .then((authResponse: AuthResponse) => {
         this.log("Fetch Azure AD 'token' with popup SUCCEDEED", authResponse);
         this.log("Fetch Graph API 'access_token' in silent mode STARTED");
@@ -207,7 +227,8 @@ export default class MicrosoftLogin extends React.Component<
           scopes,
           withUserData,
           authCallback,
-          isRedirect: false
+          isRedirect: false,
+          extraQueryParameters
         });
       })
       .catch((error: AuthError) => {
@@ -216,9 +237,14 @@ export default class MicrosoftLogin extends React.Component<
       });
   }
 
-  redirectLogin({ msalInstance, scopes, prompt }: RedirectLogin) {
+  redirectLogin({
+    msalInstance,
+    scopes,
+    prompt,
+    extraQueryParameters
+  }: RedirectLogin) {
     this.log("Fetch Azure AD 'token' with redirect STARTED");
-    msalInstance.loginRedirect({ scopes, prompt });
+    msalInstance.loginRedirect({ scopes, prompt, extraQueryParameters });
   }
 
   getUserData(authResponseWithAccessToken: AuthResponse) {
